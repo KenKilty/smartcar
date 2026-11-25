@@ -681,7 +681,11 @@ class SmartcarVehicleCoordinator(DataUpdateCoordinator):
             config = DATAPOINT_ENTITY_KEY_MAP[key]
 
             # currently polling is only supported via the v2 api
-            if config.endpoint_v2 and not entity.disabled:
+            if (
+                config.endpoint_v2
+                and not entity.disabled
+                and self.is_scope_enabled(key)
+            ):
                 self._batch_add(key)
 
     def _batch_process(self) -> list[EntityDescriptionKey]:

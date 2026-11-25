@@ -181,6 +181,43 @@ async def test_limited_scopes(
         assert hass.states.get(entity.entity_id) == snapshot(name=entity.entity_id)
 
 
+@pytest.mark.usefixtures("enable_specified_entities")
+@pytest.mark.parametrize("vehicle_fixture", ["vw_id_4"])
+@pytest.mark.parametrize(
+    "enabled_entities",
+    [DEFAULT_ENABLED_ENTITY_DESCRIPTION_KEYS],
+)
+async def test_reload_after_scopes_reduced(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    vehicle: AsyncMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test reloading after the token loses scopes used by enabled entities."""
+    await setup_integration(hass, mock_config_entry)
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+
+    entries = entity_registry.entities.get_entries_for_config_entry_id(
+        mock_config_entry.entry_id
+    )
+    assert any(
+        entry.unique_id.endswith(f"_{EntityDescriptionKey.CHARGING}")
+        and not entry.disabled
+        for entry in entries
+    )
+
+    token = dict(mock_config_entry.data["token"])
+    token["scopes"] = " ".join([*REQUIRED_SCOPES, "read_battery", "read_charge"])
+    data = dict(mock_config_entry.data)
+    data["token"] = token
+    hass.config_entries.async_update_entry(mock_config_entry, data=data)
+
+    assert await hass.config_entries.async_reload(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+
+
 @pytest.mark.usefixtures("enable_all_entities")
 @pytest.mark.parametrize("vehicle_fixture", ["vw_id_4"])
 @pytest.mark.parametrize(
